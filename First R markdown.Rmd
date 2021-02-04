@@ -1,0 +1,130 @@
+---
+title: "Exploring the BRFSS data"
+output: 
+  html_document: 
+    fig_height: 4
+    highlight: pygments
+    theme: spacelab
+---
+
+## Setup
+
+### Load packages
+
+```{r load-packages, message = FALSE}
+library(ggplot2)
+library(dplyr)
+```
+
+### Load data
+
+Make sure your data and R Markdown files are in the same directory. When loaded
+your data file will be called `brfss2013`. Delete this note when before you submit 
+your work. 
+
+```{r load-data}
+load("BRFSS.RData")
+```
+
+
+
+* * *
+
+## Part 1: Data
+
+
+* * *
+
+## Part 2: Research questions
+
+**Research question 1:** Among non-institutionalized adults in the US, is the amount of sleep associated with employment status? and among employed adults, does the time of sleep vary with income level?
+
+**Research question 2:** 
+
+**Research question 3:**
+
+
+* * *
+
+## Part 3: Exploratory data analysis
+
+NOTE: Insert code chunks as needed by clicking on the "Insert a new code chunk" 
+button (green button with orange arrow) above. Make sure that your code is visible
+in the project you submit. Delete this note when before you submit your work.
+
+**Research question 1:** To answer this question I will use the following variables:  
+1-**sleptim1**: How much time do you sleep?  
+2-**employ1**: Employment status  
+3-**income2**: Income level  
+
+I start by creating a new data frame that contains only the 3 variables I will use in this investigation and remove all rows that contain NA.
+```{r}
+q1 <- select(brfss2013,employ1,income2,sleptim1) %>% na.omit()
+dim(q1)
+```
+In the next step, I create a new variable "empstat" which categorizes those who are employed for wages and self-employed as employed while others are unemployed.
+
+```{r}
+q1 <- q1 %>%
+  mutate("empstat" = ifelse(employ1 %in% "Employed for wages", "employed", ifelse(employ1 %in% "Self-employed", "employed", "unemployed")))
+```
+
+In the next step, I create a plot that shows the relationship between employment status and amount of time slept. 
+```{r}
+q1 %>%
+  ggplot(aes(empstat, sleptim1)) + geom_boxplot()
+```  
+   
+The plot shows that employed and unemployed individuals have almost the same median hours of sleep which is around 7 and have almost the same IQR which is approximately 2. Therefore, It can be inferred that there is no correlation between the employment status and the amount of sleep time a person receives.  
+
+In the next step, I want to address the second part of the question which aims to see if amount of sleep among employed people varies with income level. To do this, I filter the data to include only employed people.  
+```{r}
+q1 <- q1 %>%
+  filter(empstat %in% "employed")
+```
+    
+In the next step, I create a new data set that involves income levels and the mode hours of sleep received by people at each income level. To do so, I use the group_by() and summarize() functions after creating a function that calculates the statistical mode.
+
+```{r}
+Mode <- function(x) {
+  ux <- unique(x)
+  ux[which.max(tabulate(match(x, ux)))]
+}
+```
+
+
+```{r}
+q1neww <- q1 %>%
+  group_by(income2) %>%
+  summarize(mode_hours = Mode(sleptim1))
+```
+   
+In the next step, I create a plot to visualize the data where income levels are plotted against mode hours of sleep in a bar chart. The labels of the x-axis were overlapping so I increased the width of the x-axis to 10. 
+   
+```{r fig.width=10}
+q1neww %>%
+  ggplot(aes(income2, mode_hours)) + geom_bar(stat = "identity")
+```
+  
+The plot shows that the mode is 8 hours for those who earn less than less than $20000, but 7 hours for those who earn $20000 or more. This could be due to chance or due to the fact that those who earn more tend to spend more time working that they have to give up an hour of sleep. To see if this is due to chance or not, I will carry out a simulation of an independent probability. But first, I want  to check the count of 7h and the count of 8h for those who earn below $20000 and above $20000.
+
+I start by extracting the rows that contains 7h or 8h for sleep time into a new dataset "q1sim" to compare the count of 7 with the count of 8
+```{r}
+q1sim <- q1 %>%
+  filter(sleptim1 == 7 | sleptim1 == 8)
+```
+
+```{r}
+q1sim %>%
+  group_by(sleptim1) %>%
+  summarise(count = n())
+```
+This tibble tells us that 7h was recorded 75811 times while 8h was recorded 56599 times. This means that the occurrence of 7h is 57% while the occurrence of 8h is 43%. Next, I will run a simulation with a 0.5 chance for both amounts of sleep being selected.
+
+```{r}
+sim_outcomes <- c(7, 8)
+sim_outcomes <- sample(sim_outcomes, size = 132410, replace = TRUE)
+table(sim_outcomes)
+```
+The results of the simulation gave 66140 7h values and 66270 8h values which means that 7h occurred 50%
+of the time and 8h occurred 50% of the time. There is a 7% difference in the results which is a great difference that can indicate that there is evidence of a correlation between amount of hours slept and income level where those who earn more than or equal $20000 are likely to sleep less hours than those who earn less.
