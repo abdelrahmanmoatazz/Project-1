@@ -16,11 +16,7 @@ library(ggplot2)
 library(dplyr)
 ```
 
-### Load data
-
-Make sure your data and R Markdown files are in the same directory. When loaded
-your data file will be called `brfss2013`. Delete this note when before you submit 
-your work. 
+### Load data  
 
 ```{r load-data}
 load("BRFSS.RData")
@@ -31,26 +27,22 @@ load("BRFSS.RData")
 * * *
 
 ## Part 1: Data
-
+The data is collected by random sampling which means that it is generalizable. However, random assignment did not take place so causation can not be established. This is an observational study
 
 * * *
 
 ## Part 2: Research questions
 
-**Research question 1:** Among non-institutionalized adults in the US, is the amount of sleep associated with employment status? and among employed adults, does the time of sleep vary with income level?
+**Research question 1:** Among non-institutionalized adults in the US, is the amount of sleep associated with employment status? and among employed adults, does the time of sleep vary with income level? This question might be of interest because it would raise awareness about the relationship between the type of work a person does and the amount of sleep they get. 
 
-**Research question 2:** 
+**Research question 2:** Among non-institutionalized adults in the US, does the gender of an individual result in a difference in how this individual thinks people in the society care about people with mental illness? This question might be of interest because it can tell if there is a difference between how each gender values mental health. 
 
-**Research question 3:**
+**Research question 3:** Among non-institutionalized adults in the US, does the number of days an individual has felt worthless in the past 30 days differ with their race? and how do these two variables correlate with the individual receiving medical treatment for emotional problem in the past 30 days? This question might be of interest because given the recent BLM movement, there has been claims that white people are not privileged and that BLM needs to change to all lives matter. The results of this study will show if there is a difference in frequency of a feeling of worthlessness and receiving medical treatment for emotional problems between white people and people of colour. 
 
 
 * * *
 
-## Part 3: Exploratory data analysis
-
-NOTE: Insert code chunks as needed by clicking on the "Insert a new code chunk" 
-button (green button with orange arrow) above. Make sure that your code is visible
-in the project you submit. Delete this note when before you submit your work.
+## Part 3: Exploratory data analysis  
 
 **Research question 1:** To answer this question I will use the following variables:  
 1-**sleptim1**: How much time do you sleep?  
@@ -128,3 +120,106 @@ table(sim_outcomes)
 ```
 The results of the simulation gave 66140 7h values and 66270 8h values which means that 7h occurred 50%
 of the time and 8h occurred 50% of the time. There is a 7% difference in the results which is a great difference that can indicate that there is evidence of a correlation between amount of hours slept and income level where those who earn more than or equal $20000 are likely to sleep less hours than those who earn less.
+
+**Research question 2:**  To answer this question I will use the following variables:  
+1-**sex**: Respondents sex  
+2-**misphlpf**: People are generally caring towards people with mental illness  
+
+I will start by creating a new dataset that contains my 2 variables and omit all NAs 
+```{r}
+q2 <- select(brfss2013, sex, misphlpf) %>% na.omit()
+dim(q2)
+```
+Now I want to see the frequency of each level of agreement regardless of gender.  
+```{r}
+q2 %>%
+  group_by(misphlpf) %>%
+  summarise(count = n())
+```
+According to this tibble, most people agree slightly with the fact that people generally care about people with mental illness. There is a level of agreement that is neither agree nor disagree which is going to be confusing and irrelevant in answering this research question so I will remove all rows that contain this answer.  
+```{r}
+`%!in%` = Negate(`%in%`)
+q2 <- q2 %>%
+  filter(misphlpf %!in% "Neither agree nor disagree")
+q2 %>%
+  group_by(misphlpf) %>%
+  summarise(count = n())
+```
+
+Now I want to group the data by gender 
+```{r}
+q2new <- q2 %>%
+  group_by(sex, misphlpf) %>%
+  summarise(count = n())
+```
+
+Since the number of females is not equal to the number of males in this data, I need to use percentages instead of the count to visualize my data so I create a new variable which is the percentage of observation.
+```{r}
+q2new <- q2new %>%
+  mutate("percentage" = (count/sum(count)) * 100) 
+```
+
+Now I want to present the data in a plot to able to compare values.
+```{r fig.width=10}
+q2new %>%
+  ggplot(aes(fill = sex, y = percentage, x = misphlpf)) + geom_bar(position = "dodge", stat = "identity")
+```
+
+The chart shows that more males agreed that people generally care about people with mental illness than females. On the contrary, more females disagreed with the statement than males.
+
+
+**Research question 3:** To answer this question I use the following variables  
+1-**X_imprace**: imputed race/ethnicity 
+2-**miswtles**: How often feel worthless in past 30 days
+3-**mistmnt**: Receiving medicine or treatment from health professional for emotional problem  
+
+To start, I extract my 3 variables into a separate dataset and remove all NAs 
+```{r}
+q3 <- brfss2013 %>%
+  select(X_imprace, miswtles, mistmnt)
+q3 <- q3 %>%
+  filter(!is.na(miswtles), !is.na(mistmnt), !is.na(X_imprace))
+```
+
+I will start by visualizing the 3 variables together 
+```{r fig.width=10, fig.height=10}
+q3 %>%
+  ggplot(aes(miswtles, mistmnt, fill = X_imprace)) + geom_jitter(aes(colour = X_imprace))
+```
+The plot shows that regardless of race or treatment, most people didn't have a feeling of worthlessness. However, if we compare the data for feeling of worthlessness and taking medication, we can see that for those who reported "None" or "A little", observations are more concentrated in no treatment received than in receiving treatment. On the other hand, those who reported a feeling of worthlessness "Most" or "All" 30 days, were more concentrated in those who are receiving medical treatment. Those who reported "Some" days of feeling worthless were evenly distributed among receiving treatment options. However, the effect of race is hard to understand from this plot, so I'll proceed into studying this relationship.
+
+I will start by seeing the count of each number of days feeling worthless in each race. But since the number of individuals is different in each race, I will create another variable that shows the percentage so I can use it in plotting.
+```{r}
+q3new<- q3 %>%
+  group_by(X_imprace, miswtles) %>%
+  summarise(count = n()) %>%
+  mutate("percentage" = ifelse(X_imprace %in% "White, Non-Hispanic", count/30636, ifelse(X_imprace %in% "Black, Non-Hispanic", count/1730, ifelse(X_imprace %in% "Asian, Non-Hispanic", count/655, ifelse(X_imprace %in% "American Indian/Alaskan Native, Non-Hispanic", count/318, ifelse(X_imprace %in% "Hispanic", count/1560, count/958)))))) %>%
+  mutate("percentage" = percentage*100)
+```
+
+Then I will visualize the data
+```{r fig.width=15}
+q3new %>%
+  ggplot(aes(X_imprace, percentage, fill = miswtles)) + geom_bar(stat = "identity", position = "dodge")
+```
+This is the full plot, but I will zoom in to see the differences among those who didn't report none because they are barely visible
+```{r fig.width=15}
+q3new %>%
+  ggplot(aes(X_imprace, percentage, fill = miswtles)) + geom_bar(stat = "identity", position = "dodge") + coord_cartesian(ylim = c(0,12))
+```
+It appears that the race that most experienced feeling of worthlessness "Most" or "All" days is the American Indian/Alaskan Native race. On the other hand, the gender that most experienced "None" days of feeling worthless but least experienced "All" days of feeling worthless is the Asian race followed by the White. Black, American Indian/Alaskan Native, Hispanic and other races had almost the same percentage of "All" days feeling worthless. 
+
+I will repeat the same steps to see the relationship between race and receiving medical treatment for emotiona problem.
+```{r}
+q3new2<- q3 %>%
+  group_by(X_imprace, mistmnt) %>%
+  summarise(count = n()) %>%
+  mutate("percentage" = ifelse(X_imprace %in% "White, Non-Hispanic", count/30636, ifelse(X_imprace %in% "Black, Non-Hispanic", count/1730, ifelse(X_imprace %in% "Asian, Non-Hispanic", count/655, ifelse(X_imprace %in% "American Indian/Alaskan Native, Non-Hispanic", count/318, ifelse(X_imprace %in% "Hispanic", count/1560, count/958)))))) %>%
+  mutate("percentage" = percentage*100)
+```
+Now I'll plot
+```{r fig.width=15}
+q3new2 %>%
+  ggplot(aes(X_imprace, percentage, fill = mistmnt)) + geom_bar(stat = "identity", position = "dodge")
+```
+The chart shows that regardless of gender, more people did not receive medical treatment for emotional problems in the past 30 days. As expected from the previous chart, American Indian/Alaskan Native race experienced the most percentage of people receiving medical treatment. Also as expected from the previous graph, Asian people show the least percentage of people receiving medical treatment for emotional problems. White people , however, show a relatively larger percentage of people receiving medical treatment for emotional problems compared to the previous chart.
